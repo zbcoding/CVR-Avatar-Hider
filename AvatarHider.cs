@@ -3,115 +3,141 @@ using System;
 using System.Collections;
 using System.Linq;
 using UnityEngine;
-using VRC.Core;
+using ABI_RC.Core;
+using ABI_RC.Core.Player;
+using ABI_RC.Core.Networking;
+using ABI_RC.Core.Networking.IO.Social;
+using System.Collections.Generic;
+using DarkRift;
 
-namespace AvatarHider
+namespace CVRAvatarHider
 {
-
-    public static class BuildInfo
-    {
-        public const string Name = "AvatarHider";
-        public const string Author = "ImTiara";
-        public const string Company = null;
-        public const string Version = "1.1.1";
-        public const string DownloadLink = "https://github.com/ImTiara/AvatarHider/releases";
-    }
-
     public class AvatarHider : MelonMod
     {
 
         private bool m_HideAvatars;
         private bool m_IgnoreFriends;
-        private bool m_ExcludeShownAvatars;
-        private bool m_DisableSpawnSound;
+        //private bool m_ExcludeShownAvatars;
+        //private bool m_DisableSpawnSound;
 
         private float m_Distance;
+        //private float m_Avatars;
 
         public override void OnApplicationStart()
         {
-            MelonPreferences.CreateCategory("AvatarHider", "Avatar Hider");
-            MelonPreferences.CreateEntry("AvatarHider", "HideAvatars", false, "Hide Avatars");
-            MelonPreferences.CreateEntry("AvatarHider", "IgnoreFriends", true, "Ignore Friends");
-            MelonPreferences.CreateEntry("AvatarHider", "ExcludeShownAvatars", true, "Exclude Shown Avatars");
-            MelonPreferences.CreateEntry("AvatarHider", "DisableSpawnSound", false, "Disable Spawn Sounds");
-            MelonPreferences.CreateEntry("AvatarHider", "HideDistance", 7.0f, "Distance (meters)");
+            MelonPreferences.CreateCategory("CVR-AvatarHider", "CVR Avatar Hider");
+            MelonPreferences.CreateEntry("CVR-AvatarHider", "HideAvatars", false, "Hide Avatars");
+            MelonPreferences.CreateEntry("CVR-AvatarHider", "IgnoreFriends", true, "Ignore Friends");
+            //MelonPreferences.CreateEntry("CVR-AvatarHider", "ExcludeShownAvatars", true, "Exclude Shown Avatars");
+            //MelonPreferences.CreateEntry("CVR-AvatarHider", "DisableSpawnSound", false, "Disable Spawn Sounds");
+            MelonPreferences.CreateEntry("CVR-AvatarHider", "HideDistance", 10.0f, "Distance (meters)");
+            //MelonPreferences.CreateEntry("CVR-AvatarHider", "Avatars", 0, "Max Amount Of Shown Avatars Near Me");
 
             OnPreferencesSaved();
 
-            MelonCoroutines.Start(AvatarScanner());
-        }
-
-        private IEnumerator AvatarScanner()
-        {
-            while (true)
-            {
-                if (m_HideAvatars && Manager.GetLocalVRCPlayer() != null)
-                {
-                    foreach (VRC.Player player in Manager.GetAllPlayers().Where(p => p != null && !p.IsMe() && p.prop_APIUser_0 != null && !(m_IgnoreFriends && p.prop_APIUser_0.IsFriendsWith()) && !(m_ExcludeShownAvatars && p.prop_APIUser_0.IsShowingAvatar())))
-                    {
-                        try
-                        {
-                            APIUser apiUser = player.prop_APIUser_0;
-                            GameObject avtrObject = player.GetAvatarObject();
-                            if (avtrObject == null)
-                                continue;
-
-                            float dist = Vector3.Distance(Manager.GetLocalVRCPlayer().transform.position, avtrObject.transform.position);
-                            bool isActive = avtrObject.active;
-
-                            if (m_HideAvatars && isActive && dist > m_Distance)
-                                avtrObject.SetActive(false);
-                            else if (m_HideAvatars && !isActive && dist <= m_Distance)
-                                avtrObject.SetActive(true);
-                            else if (!m_HideAvatars && !isActive)
-                                avtrObject.SetActive(true);
-
-                            if (m_DisableSpawnSound)
-                                avtrObject.StopSpawnSounds();
-
-                        }
-                        catch (Exception e)
-                        {
-                            MelonLogger.Msg(ConsoleColor.Red, $"Failed to scan avatar: {e}");
-                        }
-                        yield return new WaitForSeconds(.19f);
-                    }
-                }
-                yield return new WaitForSeconds(.5f);
-            }
+            MelonCoroutines.Start(AvatarHiderProcess());
         }
 
         public override void OnPreferencesSaved()
         {
             m_HideAvatars = MelonPreferences.GetEntryValue<bool>("AvatarHider", "HideAvatars");
             m_IgnoreFriends = MelonPreferences.GetEntryValue<bool>("AvatarHider", "IgnoreFriends");
-            m_ExcludeShownAvatars = MelonPreferences.GetEntryValue<bool>("AvatarHider", "ExcludeShownAvatars");
-            m_DisableSpawnSound = MelonPreferences.GetEntryValue<bool>("AvatarHider", "DisableSpawnSound");
+            //m_ExcludeShownAvatars = MelonPreferences.GetEntryValue<bool>("AvatarHider", "ExcludeShownAvatars");
+            //m_DisableSpawnSound = MelonPreferences.GetEntryValue<bool>("AvatarHider", "DisableSpawnSound");
             m_Distance = MelonPreferences.GetEntryValue<float>("AvatarHider", "HideDistance");
 
-            UnHideAvatars();
+            UnHideAllAvatars();
         }
 
-        private void UnHideAvatars()
+        //public static List<CVRPlayerEntity> networkPlayersCVR = CVRPlayerManager.Instance.NetworkPlayers;
+
+        private IEnumerator AvatarHiderProcess()
+        {
+            while (true)
+            {
+                try
+                {
+                    if (m_HideAvatars)
+                    {
+                        //find your avatar game object and id
+                        GameObject myLocalPlayer = GameObject.Find("_PLAYERLOCAL");
+                        string myOwnerID = myLocalPlayer.GetComponent<PlayerDescriptor>().ownerId;
+                        if (myLocalPlayer != null)
+                        {
+                            //check connection
+                            if (NetworkManager.Instance.GameNetwork.ConnectionState == ConnectionState.Connected)
+                            {
+                                //check each player in instance for show/hide status
+                                foreach (var player in CVRPlayerManager.Instance.NetworkPlayers)
+                                {
+                                    //does not affect your own avatar
+                                    if (player.PlayerDescriptor.ownerId != myOwnerID)
+                                    {
+                                        var avatar = player.PlayerObject.transform.Find("[PlayerAvatar]");
+                                        var distance = Vector3.Distance(myLocalPlayer.transform.position, player.PuppetMaster.avatarRootPosition);
+
+                                        if (
+                                        avatar != null
+                                        && !(m_IgnoreFriends && Friends.FriendsWith(player.Uuid))
+                                        )
+                                        //&& !(m_ExcludeShownAvatars && player.IsShowingAvatar())
+                                        {
+                                            //hide avatars far away
+                                            if (distance > m_Distance && avatar.gameObject.activeSelf)
+                                            {
+                                                avatar.gameObject.SetActive(false);
+                                            }
+                                            //show close avatar if hidden
+                                            else if (distance <= m_Distance && !avatar.gameObject.activeSelf)
+                                            {
+                                                avatar.gameObject.SetActive(true);
+                                            }
+                                        } 
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Msg(ConsoleColor.Red, $"Failed to unhide avatar {e}");
+                }
+                
+                yield return new WaitForSeconds(1f);
+            }
+        }
+
+        private void UnHideAllAvatars()
         {
             try
             {
-                foreach (VRC.Player player in Manager.GetAllPlayers())
+                if (m_HideAvatars)
                 {
-                    if (player == null || player.IsMe())
-                        continue;
+                    GameObject myLocalPlayer = GameObject.Find("_PLAYERLOCAL");
+                    string myOwnerID = myLocalPlayer.GetComponent<PlayerDescriptor>().ownerId;
+                    if (myLocalPlayer != null)
+                    {
+                        if (NetworkManager.Instance.GameNetwork.ConnectionState == ConnectionState.Connected)
+                        {
+                            foreach (var player in CVRPlayerManager.Instance.NetworkPlayers)
+                            {
+                                if (player.PlayerDescriptor.ownerId != myOwnerID)
+                                {
+                                    var avatar = player.PlayerObject.transform.Find("[PlayerAvatar]");
 
-                    GameObject avtrObject = player.GetAvatarObject();
-                    if (avtrObject == null || avtrObject.active)
-                        continue;
-
-                    avtrObject.SetActive(true);
+                                    if (avatar != null && !avatar.gameObject.activeSelf) avatar.gameObject.SetActive(true);
+                                }
+                            }
+                        }
+                    }
                 }
             }
             catch (Exception e)
-            {
-                MelonLogger.Msg(ConsoleColor.Red, $"Failed to unhide avatar: {e}");
-            }
+                {
+                    MelonLogger.Msg(ConsoleColor.Red, $"Failed to unhide avatar {e}");
+                }
+
         }
     }
 }

@@ -5,6 +5,9 @@ using VRC;
 using VRC.Core;
 using VRC.Management;
 
+using ABI_RC.Core;
+using ABI_RC.Core.Player;
+
 namespace AvatarHider
 {
     public static class Manager
@@ -29,6 +32,10 @@ namespace AvatarHider
             return false;
         }
 
+        public static List<CVRPlayerEntity> networkPlayersCVR = CVRPlayerManager.Instance.NetworkPlayers;
+
+        public static PlayerManager GetPlayerManager() => PlayerManager.prop_PlayerManager_0;
+
         public static System.Collections.Generic.List<Player> GetAllPlayers() => GetPlayerManager()?.prop_ArrayOf_Player_0.ToList();
 
         public static bool IsMe(this Player p) => p.name == GetLocalVRCPlayer().name;
@@ -37,7 +44,6 @@ namespace AvatarHider
 
         public static ModerationManager GetModerationManager() => ModerationManager.prop_ModerationManager_0;
 
-        public static PlayerManager GetPlayerManager() => PlayerManager.prop_PlayerManager_0;
 
     }
 }
