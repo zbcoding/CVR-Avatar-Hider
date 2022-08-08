@@ -7,7 +7,7 @@ using MelonLoader;
 [assembly: AssemblyDescription("CVRAvatarHider.BuildInfo.Description")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyProduct(CVRAvatarHider.BuildInfo.Name)]
-[assembly: AssemblyCopyright("Created by " + CVRAvatarHider.BuildInfo.Author + " with code snippets from Dusks, replaceable, and the VRC AvatarHider from loukylor")]
+[assembly: AssemblyCopyright("Created by " + CVRAvatarHider.BuildInfo.Author + " with code snippets from Dusks, replaceable, and the VRC AvatarHider mod from ImTiara & loukylor")]
 [assembly: AssemblyCulture("")]
 [assembly: NeutralResourcesLanguage("en")]
 [assembly: MelonInfo(typeof(CVRAvatarHider.AvatarHider), 
